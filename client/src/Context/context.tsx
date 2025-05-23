@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 
 interface Note{
-  id:number
+  id:string
   title:string
-  body:string
+  content:string
 }
 
 // Define the shape of your context
 interface GlobalContextType {
-  id: number;
-  setId: React.Dispatch<React.SetStateAction<number>>;
+  id: string;
+  setId: React.Dispatch<React.SetStateAction<string>>;
   notes:Note[];
   setNotes:React.Dispatch<React.SetStateAction<Note[]>>;
 }
@@ -23,7 +23,7 @@ interface GlobalContextProviderProps {
 }
 
 export const GlobalContextProvider: React.FC<GlobalContextProviderProps> = ({ children }) => {
-  const [id, setId] = useState<number>(1);
+  const [id, setId] = useState<string>("");
   const [notes,setNotes] = useState<Note[]>([]);
 
   const value = {

@@ -5,6 +5,7 @@ import "react-quill/dist/quill.snow.css";
 import { data, useParams } from "react-router-dom";
 import { useGlobalContext } from '../../Context/context'
 import debounce from 'lodash.debounce';
+import { updateNoteById } from "../../IndexDB/db";
 
 
 export const NoteEditor = () => {
@@ -38,21 +39,21 @@ export const NoteEditor = () => {
   const handleChange = (value: string) => {
 
     setContent(value);
-    const temp_tile = generateTitleFromContent(content ?? ""); 
+    const temp_tile = generateTitleFromContent(value ?? ""); 
     setNotes(preNotes=>
       preNotes.map(note=>
         note.id==id 
-        ? { ...note , title:temp_tile} : note
+        ? { ...note , title:temp_tile ,content:value?? ""} : note
       )
     );
     const current_id = id;
-    saveContent(id, content ?? "", temp_tile);
+    saveContent(id, value?? "", temp_tile);
     
     setNotes(prevNotes =>
       prevNotes.map(note =>
         note.id === id
-          ? { ...note, title: temp_tile, body: content??"" } // 👈 update this one
-          : note // 👈 leave others unchanged
+          ? { ...note, title: temp_tile, body: value??"" } // 👈 update this one
+          : note 
       )
     );
   };
@@ -71,20 +72,15 @@ export const NoteEditor = () => {
   };
   
   const saveContent = useCallback(
-    debounce((id:number,content:string,title:string)=>{
-      axios
-      .post("http://localhost:8080/update_notes",{
-        id:id,
-        content:content,
-        title:title
-      })
-    },2000),
-    [content,title]
+    debounce((id:string,content:string,title:string)=>{
+      updateNoteById(id,{title:title,content:content})
+    },200),
+    []
   )
   
   useEffect(()=>{
     saveContent.cancel();
-    setContent(notes.find(n=>n.id==id)?.body || '');
+    setContent(notes.find(n=>n.id==id)?.content || '');
   },[id]);
 
 

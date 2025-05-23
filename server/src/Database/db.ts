@@ -1,12 +1,17 @@
-import {Pool} from "pg";
+import { Pool } from 'pg';
 
-const pool =  new Pool({
-    user:"harsh",
-    host:"localhost",
-    database:"exp1",
-    password:"h@123",
-    port:5432
+// Your connection configuration
+const connectionConfig = {
+  user: 'postgres.chshfxzxdtdyyzcnnusr',
+  password: 'harsh@1290', // Replace with your actual password
+  host: 'aws-0-ap-south-1.pooler.supabase.com',
+  port: 6543,
+  database: 'postgres',
+  ssl: { rejectUnauthorized: false } // Often needed for Supabase connections
+};
 
-});
+// Create a new pool instance
+ export const pool = new Pool(connectionConfig);
 
+// Example function to test the connection
 export default pool;
