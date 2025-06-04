@@ -4,25 +4,29 @@ import { data, Link } from 'react-router-dom';
 import PasswordInput from '../../component/Input/PasswordInput';
 import { supabase } from '../../supabase/supabase';
 import { useNavigate } from 'react-router-dom';
-import { useGlobalContext } from '../../Context/context';
-import { syncNotes } from '../../utils/ConflictHandler';
 
+
+interface LoginInCollabProps {
+    setUserId: React.Dispatch<React.SetStateAction<string>>;
+  }
+  
 
 export async function loginWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
+  console.log(data);
   return {data,error};
 }
 
 
-const Login = () => {
-  const navigate = useNavigate();
+
+const LoginInCollab: React.FC<LoginInCollabProps> = ({ setUserId }) => {
+ 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const {userId,setUserId} = useGlobalContext();
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -44,11 +48,8 @@ const Login = () => {
         console.log(data.user?.id);
         if (data.user?.id) {
           setUserId(data.user.id);
-          console.log(userId);
         }
-        syncNotes(data.user?.id);
-        navigate('/home',{state:{data}});
-      }
+          }
     });
   };
 
@@ -88,4 +89,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoginInCollab;

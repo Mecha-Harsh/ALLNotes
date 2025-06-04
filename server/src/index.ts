@@ -5,6 +5,9 @@ import get_notes from "./get_notes";
 import add_notes from "./add_notes"
 import update_notes from "./update_notes"
 import test from './Database/indexedb1';
+import verifyMail from  "./Collab/verifyMail";
+import verifyPermission from "./Collab/verifyPermisssion"
+import  getAllNotes  from "./getAllnotes"
 const app = express();
 const port = 8080;
 
@@ -13,11 +16,14 @@ const corsOption = {
 };
 
 app.use(cors(corsOption));
-app.use(express.json()); // forget this fucker took my 1.5 hour to debug
+app.use(express.json()); 
 
 app.get('/api',(req,res)=>{
     res.json({"msg":"hello"});
 })
+app.use('/getAllNotes',getAllNotes);
+app.use('/verifyPermission',verifyPermission);
+app.use('/verifyMail',verifyMail);
 app.use('/update_notes',update_notes);
 app.get('/notes',get_notes);
 app.post('/add_notes',add_notes);
