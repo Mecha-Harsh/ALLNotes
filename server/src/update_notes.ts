@@ -1,13 +1,35 @@
 import express, { Request, Response } from "express";
 import pool from "./Database/db";
+import { error } from "console";
+import { authenticateSupabaseToken } from "./middleware/supebaseAuth";
 
 const router = express.Router();
 
-router.post('/', async (req: Request, res: Response): Promise<any> => {
-  const { id, title, content, updatedAt, userId } = req.body;
+
+router.post('/', authenticateSupabaseToken,async (req: Request, res: Response): Promise<any> => {
+  const { _userId,id, title, content, updatedAt } = req.body;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({error: "Authentication required"});
+  }
+
+  if (!_userId) {
+    return res.status(400).json({error: "userId is required in request body"});
+  }
+
+  // Then compare
+  if(String(userId) !== String(_userId)){
+    return res.status(401).json({error: "Unauthorized: User ID mismatch"});
+  }
 
   if (!id || !title || !content) {
     return res.status(400).json({ error: "Missing required fields: id, title, or content" });
+  }
+
+  if(userId==="Guest" || !userId){
+    res.sendStatus(406);
+    return;
   }
 
   let client;
@@ -26,7 +48,7 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
 
     // Update note
     const updateResult = await client.query(
-      'UPDATE notes SET content = $1, title = $2, updated_at = $3 WHERE id = $4 RETURNING *',
+      'UPDATE notes SET content = $1, title = $2, updatedat = $3 WHERE id = $4 RETURNING *',
       [content, title, updatedAt, id]
     );
 

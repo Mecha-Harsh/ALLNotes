@@ -4,7 +4,6 @@ import { json } from "stream/consumers";
 import get_notes from "./get_notes";
 import add_notes from "./add_notes"
 import update_notes from "./update_notes"
-import test from './Database/indexedb1';
 import verifyMail from  "./Collab/verifyMail";
 import verifyPermission from "./Collab/verifyPermisssion"
 import  getAllNotes  from "./getAllnotes"
@@ -27,7 +26,6 @@ app.use('/verifyMail',verifyMail);
 app.use('/update_notes',update_notes);
 app.get('/notes',get_notes);
 app.post('/add_notes',add_notes);
-app.post('/test',test);
 app.listen(port,()=>{
     console.log(`The app is listenin on the port ${port}`);
 })

@@ -2,12 +2,16 @@ import express, { Response, Request } from "express";
 import pool from "../Database/db";
 import { json } from "stream/consumers";
 import { error } from "console";
-
+import { authenticateSupabaseToken } from "../middleware/supebaseAuth";
 
 const router = express.Router();
 
-router.get('/', async (req:Request, res:Response):Promise<any> => {
+router.get('/', authenticateSupabaseToken ,async (req:Request, res:Response):Promise<any> => {
     const client = await pool.connect();
+    const userId = req.user?.id;
+    if(!userId){
+        res.sendStatus(401).json({error:"Not authenticaed"});
+    }
     try {
         const { email, note_id } = req.query;
         if (!email) {
@@ -15,6 +19,15 @@ router.get('/', async (req:Request, res:Response):Promise<any> => {
             return res.status(400).json({ error: "No email provided" });
         }
 
+        const verify = await client.query(
+            "SELECT 1 FROM notes WHERE owner = $1 AND id = $2", 
+            [userId, note_id]
+        );
+        
+        if (verify.rows.length === 0) {
+            console.log("The user is not the owner");
+            return res.status(403).json({ error: "You don't own this note" }); // ✅ 403 Forbidden + return
+        }
         // Find user by email
         const response = await client.query(
             "SELECT id FROM auth.users WHERE email = $1",

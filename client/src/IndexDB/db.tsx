@@ -75,9 +75,7 @@ export async function getAllNotes(userId: string): Promise<any[]> {
 }
 
 export async function updateNoteById(
-  id: string,
-  updatedFields: { title?: string; content?: string }
-) {
+id: string, updatedFields: { title?: string; content?: string; }) {
   const db = await openDB();
   const tx = db.transaction("notes", "readwrite");
   const store = tx.objectStore("notes");
@@ -97,7 +95,7 @@ export async function updateNoteById(
       if (updatedFields.title !== undefined) note.title = updatedFields.title;
       if (updatedFields.content !== undefined) note.content = updatedFields.content;
       note.updatedAt = new Date().toISOString();
-      note.synced = false; // Always boolean
+      note.synced = false;
 
       const putRequest = store.put(note);
 
@@ -135,7 +133,7 @@ export async function updateNoteSync(id: string, synced: boolean) {
   });
 }
 
-export async function getUnsyncedNotes(): Promise<any[]> {
+export async function getUnsyncedNotes(userId:string): Promise<any[]> {
   const db = await openDB();
   const tx = db.transaction("notes", "readonly");
   const store = tx.objectStore("notes");
@@ -156,7 +154,7 @@ export async function getUnsyncedNotes(): Promise<any[]> {
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject("Failed to fetch notes");
       });
-      return allNotes.filter(note => note.synced === false);
+      return allNotes.filter(note => note.synced === false && note.userId=== userId);
     }
   } else {
     // Fallback: get all and filter
@@ -167,4 +165,36 @@ export async function getUnsyncedNotes(): Promise<any[]> {
     });
     return allNotes.filter(note => note.synced === false);
   }
+}
+
+
+
+export async function deleteAllUserNotes(userId:string): Promise<any>{
+  const db = await openDB();
+  const tx = db.transaction("notes","readwrite");
+  const store = tx.objectStore("notes");
+
+  if(store.indexNames.contains("userId")){
+    const index = store.index("userId");
+    return new Promise((resolve, reject) => {
+      const allNotesRequest = index.getAll(userId);
+      allNotesRequest.onsuccess = async () => {
+        const notes = allNotesRequest.result;
+        try {
+          for (const note of notes) {
+            await new Promise<void>((res, rej) => {
+              const deleteRequest = store.delete(note.id);
+              deleteRequest.onsuccess = () => res();
+              deleteRequest.onerror = () => rej(deleteRequest.error);
+            });
+          }
+          resolve(true);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      allNotesRequest.onerror = () => reject(allNotesRequest.error);
+    });
+  }
+  
 }

@@ -1,12 +1,15 @@
 import express,{Request,Response} from "express";
 import pool from "../Database/db";
+// import { authenticateSupabaseToken } from "../middleware/supebaseAuth";
+import { authenticateSupabaseToken } from "../middleware/supebaseAuth";
 const router = express.Router();
 
-router.get('/', async (req:Request, res:Response):Promise<any> => {
+router.get('/',authenticateSupabaseToken, async (req:Request, res:Response):Promise<any> => {
     console.log("verifyPermission route hit");
     let client;
     try {
-        const { id, userId } = req.query;
+        const  {id}  = req.query;
+        const userId = req.user?.id;
         console.log("id:", id, "userId:", userId);
 
         if (!id || !userId || id === "anonymous") {
@@ -21,9 +24,9 @@ router.get('/', async (req:Request, res:Response):Promise<any> => {
         );
 
         if (response.rows.length > 0) {
-            res.send(response.rows);
+            res.send({data:response.rows,userId:userId});
         } else {
-            res.status(404).send({ error: "the user does not exist" });
+            res.status(409).send({ error: "the user does not exist" });
         }
     } catch (e) {
         console.error("error", e); // Log full error

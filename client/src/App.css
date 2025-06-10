@@ -11,3 +11,51 @@
     --clolor-primary: #2BB5FF;
   }
 
+  .ql-toolbar {
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background: #f7fafc !important;
+    padding: 16px !important;
+  }
+  
+  .ql-container {
+    border: none !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+  }
+  
+  .ql-editor {
+    padding: 24px !important;
+    min-height: 400px !important;
+  }
+  
+  .ql-editor:focus {
+    outline: none !important;
+  }
+  
+  .ql-toolbar .ql-stroke {
+    stroke: #4a5568 !important;
+  }
+  
+  .ql-toolbar .ql-fill {
+    fill: #4a5568 !important;
+  }
+  
+  .ql-toolbar button:hover {
+    background: #e2e8f0 !important;
+  }
+  
+  .ql-toolbar button.ql-active {
+    background: #3182ce !important;
+    color: white !important;
+  }
+  
+  .ql-toolbar button.ql-active .ql-stroke {
+    stroke: white !important;
+  }
+  
+  .ql-toolbar button.ql-active .ql-fill {
+    fill: white !important;
+  }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useGlobalContext } from "../../Context/context";
+import getAuthToken from "../../utils/getToken";
 
 const Collabdropdown = () => {
   const{id,userId} = useGlobalContext();
@@ -10,16 +11,17 @@ const Collabdropdown = () => {
   const  navigate = useNavigate();
 
   const startCollab = () => {
-    const url = `/collab?userId=${encodeURIComponent(userId)}&id=${encodeURIComponent(id)}`;
+    const url = `/collab?id=${encodeURIComponent(id)}`;
     console.log("the people was invited!!");
     window.open(url, '_blank');
   };
   
   const handleClick = async(e: React.FormEvent) => {
+    const token = getAuthToken();
     e.preventDefault();
     
     try {
-      const response =  await axios.get("http://localhost:8080/verifyMail", { params: { email: email , note_id:id} });
+      const response =  await axios.get("http://localhost:8080/verifyMail", { params: { email: email , note_id:id} , headers:{'Authorization': `Bearer ${token}`}} );
       if (response.status !== 200) {
         alert("user is not registered or invalid mail");
         return;

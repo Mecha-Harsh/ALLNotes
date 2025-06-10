@@ -12,12 +12,30 @@ import { FaColonSign } from 'react-icons/fa6';
 
 Quill.register('modules/cursors', QuillCursors);
 
+
+const getAuthToken = (): string | null => {
+  try {
+    const authData = localStorage.getItem('sb-chshfxzxdtdyyzcnnusr-auth-token');
+      if (authData) {
+      const parsed = JSON.parse(authData);
+      return parsed.access_token;
+    }
+  } catch (error) {
+    console.error('Error parsing auth token:', error);
+  }
+  return null;
+};
+
+
+
 interface CollaborativeEditorProps {
   roomName?: string;
   placeholder?: string;
   userName?: string;
   userColor?: string;
 }
+
+
 
 const _modules = {
   toolbar: [
@@ -44,6 +62,8 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
   userName: propUserName,
   userColor = 'blue',
 }) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const[participants,setParticipants] = useState<string[]>([]);
   const [content,setContent] = useState<string>("");
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<Quill | null>(null);
@@ -52,12 +72,16 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
   const [searchParams] = useSearchParams();
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string>("anonymous");
-
+  // const [token,setToken] = useState<any>(null);
   // Get params from URL or use props as fallback
   const roomName = searchParams.get("id") ?? propRoomName ?? 'default-room';
   
-  useEffect(() => {
-    setUserId(searchParams.get("userId") ?? "anonymous");
+
+
+  useEffect( () => {
+    //  const resp = axios.get("http://localhost:8080/CollabNotes", { params: { id: roomName } });
+    //  resp.then(response => setContent(response.data.content));
+    //  console.log(resp);
   }, [searchParams]);
 
   // Function to log Quill content
@@ -67,6 +91,7 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
       const textContent = quillRef.current.getText();
       const delta = quillRef.current.getContents();
       
+
       console.log(`=== Quill Content Log (${source}) ===`);
       setContent(htmlContent);
       console.log('HTML:', htmlContent);
@@ -88,13 +113,20 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
     console.log("Permission useEffect triggered");
     const checkPermission = async () => {
       console.log("Starting permission check...");
+      const token = getAuthToken();
+      console.log("the user found:",token);
       try {
         const response = await axios.get("http://localhost:8080/verifyPermission", {
-          params: { id: roomName, userId: userId }
+          params: { id: roomName },
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
-        console.log("Permission API response:", response.data);
         
-        const per = response.data[0]?.permission || [];
+        setUserId(response.data.userId)
+        console.log("Permission API response:", response.data.data);
+        
+        const per = response.data.data[0]?.permission || [];
         console.log("Extracted permissions:", per);
         
         if (per.includes("r") && per.includes("w")) {
@@ -112,7 +144,7 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
     
     setIsVerified(null); // Show loading on param change
     checkPermission();
-  }, [roomName, userId, searchParams, propUserName]);
+  }, [roomName, userId, searchParams, propUserName,setUserId]);
 
   // Editor initialization
   useLayoutEffect(() => {
@@ -179,11 +211,45 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
           }, 0);
         });
 
+
+
+        const updateParticipants = () => {
+          if (!_provider?.awareness) return;
+          
+          const states = _provider.awareness.getStates();
+          const userNames = Array.from(states.values())
+            .map(state => state.user?.name)
+            .filter((name): name is string => !!name && name.trim() !== '');
+          
+          console.log('Updating participants:', userNames);
+          setParticipants(userNames);
+        };
+        
+
+        const getUserColor = (name: string) => {
+          const colors = [
+            'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+            'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+            'bg-orange-500', 'bg-cyan-500'
+          ];
+          let hash = 0;
+          for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          return colors[Math.abs(hash) % colors.length];
+        };
+
+
         // Listen for provider sync events
         _provider.on('sync', (isSynced: boolean) => {
           console.log('Provider sync status:', isSynced);
+          // const states = _provider?.awareness.getStates();
+          // const userNames = Array.from((states ?? new Map()).values()).map(state => state.user?.name).filter(Boolean);
+          // setParticipants(userNames);
+          
           if (isSynced) {
             setTimeout(() => {
+              updateParticipants();
               logQuillContent('provider-synced');
             }, 100); // Small delay to ensure content is loaded
           }
@@ -195,6 +261,11 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
           name: userId,
           color: userColor,
         });
+
+        const awarenessChangeHandler = () => {
+          updateParticipants();
+        }
+        _provider.awareness.on('change', awarenessChangeHandler);
 
         if (isMounted) {
           console.log("Setting provider and connection state");
@@ -213,6 +284,10 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
         setTimeout(() => {
           logQuillContent('delayed-after-init');
         }, 1000);
+
+        setTimeout(()=>{
+          updateParticipants();
+        },500);
 
         console.log("Editor initialization complete");
       } catch (error) {
@@ -330,6 +405,16 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
         <span className="ml-4">User: {userId}</span>
         <span className="ml-4">Verified: {isVerified ? 'Yes' : 'No'}</span>
       </div>
+      <div className="mt-2 text-sm text-gray-600">
+      <span>Participants ({participants.length}): </span>
+      {participants.length > 0 ? (
+        <span className="font-medium">
+          {participants.join(', ')}
+        </span>
+      ) : (
+        <span className="text-gray-400">No participants connected</span>
+      )}
+    </div>
     </div>
   );
 };

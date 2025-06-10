@@ -74,3 +74,11 @@
 // })().catch(error => {
 //   console.error('Error during IndexedDB test:', error);
 // });
+
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+console.log(supabaseServiceKey);

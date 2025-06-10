@@ -1,56 +1,107 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../../component/Navbar/Navbar';
-import { data, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import PasswordInput from '../../component/Input/PasswordInput';
 import { supabase } from '../../supabase/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalContext } from '../../Context/context';
 import { syncNotes } from '../../utils/ConflictHandler';
-
+import { useVerifyUser } from '../../utils/verifyUser';
 
 export async function loginWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
-  return {data,error};
+  return { data, error };
 }
-
 
 const Login = () => {
   const navigate = useNavigate();
+  const [user, setUser] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const {userId,setUserId} = useGlobalContext();
+  const { userId, setUserId } = useGlobalContext();
+  const verifyUser = useVerifyUser(); // Use the custom hook
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+  // Check for existing valid token on component mount
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        const verifiedUserId = await verifyUser();
+        if (verifiedUserId && verifiedUserId !== "Guest") {
+          setUser(verifiedUserId);
+          console.log('Auto-login successful for user:', verifiedUserId);
+          syncNotes(userId,setIsLoading).then(()=>{
+            navigate('/', { state: { user: verifiedUserId } });
+          });
+        } else {
+          console.log('No valid session found');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkExistingAuth();
+  }, [verifyUser, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    console.log("Email:", email);
-    console.log("Password:", password);
-
-   
-    // Example: simple validation
+    setError(null);
+    
     if (!email || !password) {
       setError("Please fill in both fields.");
       return;
     }
-    loginWithEmail(email, password).then(({ data, error }) => {
+
+    setIsAuthenticating(true);
+
+    try {
+      const { data, error } = await loginWithEmail(email, password);
+      
       if (error) {
-        console.log(error);
+        console.log('Login error:', error);
         setError(error.message);
-      } else {
-        setError(null);
-        console.log(data.user?.id);
-        if (data.user?.id) {
-          setUserId(data.user.id);
-          console.log(userId);
-        }
-        syncNotes(data.user?.id);
-        navigate('/home',{state:{data}});
+      } else if (data.user?.id) {
+        setUserId(data.user.id);
+        setUser(data.user.id);
+        console.log('Manual login successful for user:', data.user.id);
+        
+        syncNotes(data.user.id, () => {
+          setIsAuthenticating(false);
+          navigate('/', { state: { user: data.user.id } });
+        });
+        return;
       }
-    });
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Login error:", err);
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <>
+        <Navbar />
+        <div className='flex items-center justify-center mt-28'>
+          <div className='w-96 border rounded bg-white px-7 py-10 text-center'>
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <p className="ml-2">Checking authentication...</p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -60,20 +111,26 @@ const Login = () => {
           <form onSubmit={handleSubmit}>
             <h4 className="text-2xl mb-7">Login</h4>
             <input
-              type="text"
+              type="email"
               placeholder="Email"
               className="input-box w-full px-4 py-2 border rounded mb-4"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isAuthenticating}
             />
-            <PasswordInput 
-              str={password} 
-              onChange={(e) => setPassword(e.target.value)} 
+            <PasswordInput
+              str={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
+              // disabled={isAuthenticating}
             />
             {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-            <button type="submit" className="btn-primary w-full mt-4 py-2 bg-blue-500 text-white rounded">
-              Login
+            <button 
+              type="submit" 
+              className="btn-primary w-full mt-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isAuthenticating}
+            >
+              {isAuthenticating ? 'Logging in...' : 'Login'}
             </button>
             <p className="text-sm text-center mt-4">
               Not registered yet?{" "}

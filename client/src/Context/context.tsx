@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 
 interface Note{
+  [x: string]: string | number | Date;
+  synced: any;
+  updatedat: string | number | Date;
   id:string
   title:string
   content:string

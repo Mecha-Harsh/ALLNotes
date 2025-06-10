@@ -13,8 +13,8 @@ import './App.css';
 const routes = (
   <Router>
     <Routes>
-      <Route path='/home' element={<Home />} />
-      <Route path='/' element={<Login />} />
+      <Route path='/' element={<Home />} />
+      <Route path='/login' element={<Login />} />
       <Route path='/signup' element={<SignUp />} />
       <Route path='/test' element={<TestPage />} />
       <Route path='/verify' element={<Verify />} />
