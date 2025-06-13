@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
+import React, { useLayoutEffect, useRef, useState, useEffect, useCallback } from 'react';
 import * as Y from 'yjs';
 import { QuillBinding } from 'y-quill';
 import Quill from 'quill';
@@ -6,26 +6,14 @@ import QuillCursors from 'quill-cursors';
 import 'quill/dist/quill.snow.css';
 import { WebsocketProvider } from "y-websocket";
 import axios from 'axios';
+import getAuthToken from '../../utils/getToken';
 import { useSearchParams } from 'react-router-dom';
 import LoginInCollab from '../Login/lgoin_in_collab';
-import { FaColonSign } from 'react-icons/fa6';
+import { Users, Circle, Save, Wifi, WifiOff } from 'lucide-react';
+import { IndexeddbPersistence } from 'y-indexeddb';
+
 
 Quill.register('modules/cursors', QuillCursors);
-
-
-const getAuthToken = (): string | null => {
-  try {
-    const authData = localStorage.getItem('sb-chshfxzxdtdyyzcnnusr-auth-token');
-      if (authData) {
-      const parsed = JSON.parse(authData);
-      return parsed.access_token;
-    }
-  } catch (error) {
-    console.error('Error parsing auth token:', error);
-  }
-  return null;
-};
-
 
 
 interface CollaborativeEditorProps {
@@ -34,8 +22,6 @@ interface CollaborativeEditorProps {
   userName?: string;
   userColor?: string;
 }
-
-
 
 const _modules = {
   toolbar: [
@@ -62,9 +48,8 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
   userName: propUserName,
   userColor = 'blue',
 }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const[participants,setParticipants] = useState<string[]>([]);
-  const [content,setContent] = useState<string>("");
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [content, setContent] = useState<string>("");
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<Quill | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -72,33 +57,35 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
   const [searchParams] = useSearchParams();
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string>("anonymous");
-  // const [token,setToken] = useState<any>(null);
+  
   // Get params from URL or use props as fallback
   const roomName = searchParams.get("id") ?? propRoomName ?? 'default-room';
-  
 
+  // Helper function to get user color based on name
+  const getUserColor = (name: string) => {
+    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
 
-  useEffect( () => {
-    //  const resp = axios.get("http://localhost:8080/CollabNotes", { params: { id: roomName } });
-    //  resp.then(response => setContent(response.data.content));
-    //  console.log(resp);
-  }, [searchParams]);
+  // const setQuillContent =()=>{
+  //   if(quillRef.current){
+  //     const htmlContent = '<p>Your default <strong>HTML content</strong></p>';
+  //     quillRef.current.root.innerHTML = htmlContent;
+  //   }
+  // };
+
 
   // Function to log Quill content
   const logQuillContent = (source = 'unknown') => {
     if (quillRef.current) {
       const htmlContent = quillRef.current.root.innerHTML;
-      const textContent = quillRef.current.getText();
-      const delta = quillRef.current.getContents();
-      
-
-      console.log(`=== Quill Content Log (${source}) ===`);
+      // const textContent = quillRef.current.getText();
+      // const delta = quillRef.current.getContents();
       setContent(htmlContent);
-      console.log('HTML:', htmlContent);
-      console.log('Text:', textContent);
-      console.log('Delta:', delta);
-      console.log('Is empty:', htmlContent === '<p><br></p>' || textContent.trim() === '');
-      console.log('=====================================');
     } else {
       console.log(`Quill not initialized yet (${source})`);
     }
@@ -144,14 +131,14 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
     
     setIsVerified(null); // Show loading on param change
     checkPermission();
-  }, [roomName, userId, searchParams, propUserName,setUserId]);
+  }, [roomName, userId, searchParams, propUserName, setUserId]);
 
   // Editor initialization
   useLayoutEffect(() => {
     console.log("useLayoutEffect triggered - isVerified:", isVerified);
     
     // Don't initialize if not verified or still checking
-    if (!isVerified || !editorRef.current) {
+    if (!isVerified || !editorRef.current ) {
       console.log("Not verified or editorRef null, skipping editor initialization");
       return;
     }
@@ -169,9 +156,24 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
         // 1. Create Yjs document
         ydoc = new Y.Doc();
 
+
+      const indexeddbProvider = new IndexeddbPersistence(roomName, ydoc);
+      
+        // STEP 3B: Wait for local data to load first
+      indexeddbProvider.whenSynced;
+      console.log('Local IndexedDB data loaded');
+        
+        // STEP 3C: Listen for sync events
+        indexeddbProvider.on('synced', () => {
+          console.log('IndexedDB synced successfully');
+        });
+  
+
+
         console.log("Creating WebSocket provider");
         // 2. Create WebSocket provider
         _provider = new WebsocketProvider('ws://localhost:1234', roomName, ydoc);
+      
 
         console.log("Getting shared text type");
         // 3. Get shared text type
@@ -187,6 +189,7 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
 
         // Set the ref immediately
         quillRef.current = quill;
+        
         
         // Log initial state (will likely be empty)
         logQuillContent('after-quill-init');
@@ -209,9 +212,10 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
           setTimeout(() => {
             logQuillContent('yjs-text-change');
           }, 0);
+          
         });
 
-
+        // setQuillContent();
 
         const updateParticipants = () => {
           if (!_provider?.awareness) return;
@@ -224,28 +228,10 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
           console.log('Updating participants:', userNames);
           setParticipants(userNames);
         };
-        
-
-        const getUserColor = (name: string) => {
-          const colors = [
-            'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
-            'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
-            'bg-orange-500', 'bg-cyan-500'
-          ];
-          let hash = 0;
-          for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-          }
-          return colors[Math.abs(hash) % colors.length];
-        };
-
 
         // Listen for provider sync events
         _provider.on('sync', (isSynced: boolean) => {
           console.log('Provider sync status:', isSynced);
-          // const states = _provider?.awareness.getStates();
-          // const userNames = Array.from((states ?? new Map()).values()).map(state => state.user?.name).filter(Boolean);
-          // setParticipants(userNames);
           
           if (isSynced) {
             setTimeout(() => {
@@ -325,29 +311,29 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
 
   // Debug function to manually log content
   const debugLogContent = async() => {
+    const token = getAuthToken();
     try{
-      // const { id, title, content, updatedAt }
-      const response = await axios.post("http://localhost:8080/update_notes",{id:roomName,userId:userId,
-        title:"for now exp",content:content,updatedAt: new Date().toISOString()
-      });
+      const response = await axios.post("http://localhost:8080/update_notes",{
+        id: roomName,
+        _userId: userId,
+        title: "for now exp",
+        content: content,
+        updatedAt: new Date().toISOString()
+      },{headers:{'Authorization':`Bearer ${token}`}});
     }catch{
       alert("you are not the owner of the file!!!");
     }
   };
 
-  // Debug render states
-  console.log("About to check render conditions:");
-  console.log("isVerified === null:", isVerified === null);
-  console.log("!isVerified:", !isVerified);
-  console.log("Should render editor:", isVerified === true);
-
   // Loading state
   if (isVerified === null) {
     console.log("Rendering loading state");
     return (
-      <div className="max-w-4xl mx-auto p-6 bg-white">
-        <div className="text-center py-8">
-          <div className="text-lg">Checking permissions...</div>
+      <div className="flex h-screen bg-gray-100">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center py-8">
+            <div className="text-lg">Checking permissions...</div>
+          </div>
         </div>
       </div>
     );
@@ -365,56 +351,109 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
 
   console.log("Rendering main editor component");
 
-  // Main editor component
+  // Main editor component with sidebar
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Collaborative Editor</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={debugLogContent}
-            className="px-4 py-2 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            Save
-          </button>
-          <button
-            onClick={toggleConnection}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              isConnected ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-            } text-white`}
-          >
-            {isConnected ? 'Disconnect' : 'Connect'}
-          </button>
+    <div className="flex h-screen bg-gray-100">
+      {/* Left Sidebar - People List */}
+      <div className="w-80 bg-white border-r border-gray-300 flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-800">Collaborators</h2>
+            <span className="ml-auto bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+              {participants.length} online
+            </span>
+          </div>
+        </div>
+        
+        {/* People List */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-3">
+            {participants.length > 0 ? (
+              participants.map((participant, index) => (
+                <div 
+                  key={`${participant}-${index}`} 
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="relative">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm"
+                      style={{ backgroundColor: getUserColor(participant) }}
+                    >
+                      {participant.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                    <Circle className="absolute -bottom-1 -right-1 w-4 h-4 text-green-500 fill-green-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{participant}</p>
+                    <p className="text-sm text-gray-500">Online</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p>No participants connected</p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Connection Status */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-500" />
+              )}
+              <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            <span className="text-gray-500">Room: {roomName}</span>
+          </div>
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-hidden shadow-sm">
-        <div ref={editorRef} className="min-h-[300px] bg-white" />
+      {/* Right Side - Editor */}
+      <div className="flex-1 flex flex-col">
+        {/* Editor Header */}
+        <div className="bg-white border-b border-gray-300 p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-semibold text-gray-800">Collaborative Editor</h1>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500">User: {userId}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={debugLogContent}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  Save
+                </button>
+                <button
+                  onClick={toggleConnection}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isConnected ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+                  } text-white`}
+                >
+                  {isConnected ? 'Disconnect' : 'Connect'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Editor Content */}
+        <div className="flex-1 p-6 bg-white overflow-auto">
+          <div className="border rounded-lg overflow-hidden shadow-sm h-full">
+            <div ref={editorRef} className="h-full bg-white" />
+          </div>
+        </div>
       </div>
-
-      <div className="mt-4 text-sm text-gray-600">
-        <span
-          className={`inline-flex items-center ${
-            isConnected ? 'text-green-600' : 'text-red-600'
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          {isConnected ? 'Connected' : 'Disconnected'}
-        </span>
-        <span className="ml-4">Room: {roomName}</span>
-        <span className="ml-4">User: {userId}</span>
-        <span className="ml-4">Verified: {isVerified ? 'Yes' : 'No'}</span>
-      </div>
-      <div className="mt-2 text-sm text-gray-600">
-      <span>Participants ({participants.length}): </span>
-      {participants.length > 0 ? (
-        <span className="font-medium">
-          {participants.join(', ')}
-        </span>
-      ) : (
-        <span className="text-gray-400">No participants connected</span>
-      )}
-    </div>
     </div>
   );
 };

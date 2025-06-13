@@ -52,7 +52,7 @@ export const authenticateSupabaseToken = async (
       } as AuthError);
       return;
     }
-
+    console.log("USER EMAIL::::::::",user?.email);
     // Add user info to request object
     req.user = user;
     req.token = token;

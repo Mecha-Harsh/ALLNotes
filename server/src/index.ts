@@ -7,6 +7,8 @@ import update_notes from "./update_notes"
 import verifyMail from  "./Collab/verifyMail";
 import verifyPermission from "./Collab/verifyPermisssion"
 import  getAllNotes  from "./getAllnotes"
+import removeUser from "./Collab/removeUsersFromCollab";
+import getCollabUsers from "./Collab/getCollabUsers";
 const app = express();
 const port = 8080;
 
@@ -26,6 +28,9 @@ app.use('/verifyMail',verifyMail);
 app.use('/update_notes',update_notes);
 app.get('/notes',get_notes);
 app.post('/add_notes',add_notes);
+app.use('/removeUser',removeUser);
+app.get('/getCollabUsers',getCollabUsers);
+
 app.listen(port,()=>{
     console.log(`The app is listenin on the port ${port}`);
 })

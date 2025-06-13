@@ -18,6 +18,7 @@ export async function loginWithEmail(email: string, password: string) {
 
 const Login = () => {
   const navigate = useNavigate();
+  const [isVerified, setIsVerified] = useState(false);
   const [user, setUser] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
@@ -35,9 +36,7 @@ const Login = () => {
         if (verifiedUserId && verifiedUserId !== "Guest") {
           setUser(verifiedUserId);
           console.log('Auto-login successful for user:', verifiedUserId);
-          syncNotes(userId,setIsLoading).then(()=>{
-            navigate('/', { state: { user: verifiedUserId } });
-          });
+          setIsVerified(true);
         } else {
           console.log('No valid session found');
         }
@@ -50,6 +49,14 @@ const Login = () => {
 
     checkExistingAuth();
   }, [verifyUser, navigate]);
+
+
+  const handleAutoLogin=()=>{
+    syncNotes(userId,setIsLoading).then(()=>{
+     navigate('/',{state:{user:userId}});
+    });
+  }
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -139,6 +146,14 @@ const Login = () => {
               </Link>
             </p>
           </form>
+          <button 
+              onClick={handleAutoLogin}
+              className="w-full mt-3 py-2 bg-green-100 text-green-700 border border-green-300 rounded hover:bg-green-200 hover:border-green-400 transition-colors duration-200 font-medium text-sm shadow-sm"
+              disabled={isAuthenticating}
+            >
+              {`Continue as ${userId}`}
+            </button>
+
         </div>
       </div>
     </>

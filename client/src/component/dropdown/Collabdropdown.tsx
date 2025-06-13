@@ -1,78 +1,165 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useGlobalContext } from "../../Context/context";
 import getAuthToken from "../../utils/getToken";
 
-const Collabdropdown = () => {
-  const{id,userId} = useGlobalContext();
+interface CollabdropdownProps {
+  onClose: () => void;
+}
+
+const Collabdropdown: React.FC<CollabdropdownProps> = ({ onClose }) => {
+  const { id, userId } = useGlobalContext();
   const [email, setEmail] = useState<string>("");
   const [verifiedEmail, setVerifiedEmail] = useState<string[]>([]);
-  const  navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const startCollab = () => {
-    const url = `/collab?id=${encodeURIComponent(id)}`;
-    console.log("the people was invited!!");
-    window.open(url, '_blank');
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  const startCollab = async () => {
+    if (verifiedEmail.length === 0) {
+      alert("Please add at least one collaborator before sending invites");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Send invites to all verified emails
+      const token = getAuthToken();
+      // await axios.post("http://localhost:8080/sendInvites", {
+      //   noteId: id,
+      //   emails: verifiedEmail
+      // }, {
+      //   headers: { 'Authorization': `Bearer ${token}` }
+      // });
+
+      const url = `/collab?id=${encodeURIComponent(id)}`;
+      console.log("Invites sent successfully!");
+      window.open(url, '_blank');
+      onClose(); // Close dropdown after success
+    } catch (error) {
+      console.error("Error sending invites:", error);
+      alert("Failed to send invites. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleClick = async(e: React.FormEvent) => {
-    const token = getAuthToken();
+  const handleAddEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) return;
+
+    const token = getAuthToken();
+    setIsLoading(true);
     
     try {
-      const response =  await axios.get("http://localhost:8080/verifyMail", { params: { email: email , note_id:id} , headers:{'Authorization': `Bearer ${token}`}} );
-      if (response.status !== 200) {
-        alert("user is not registered or invalid mail");
-        return;
-      } else {
-        console.log("recieved data",response.data["id"]);
+      const response = await axios.get("http://localhost:8080/verifyMail", { 
+        params: { email: email, note_id: id }, 
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.status === 200) {
+        console.log("Received data", response.data["id"]);
         if (email && !verifiedEmail.includes(email)) {
           setVerifiedEmail(prev => [...prev, email]);
         }
+        setEmail(""); // Clear input after successful add
       }
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
-        alert("user is not registered or invalid mail");
-        return;
+        alert("User is not registered or invalid email");
       } else {
         console.error(error);
+        alert("Error verifying email. Please try again.");
       }
+    } finally {
+      setIsLoading(false);
     }
-    
-    setEmail(""); 
+  };
+
+  const removeEmail = (emailToRemove: string) => {
+    setVerifiedEmail(prev => prev.filter(email => email !== emailToRemove));
   };
 
   return (
-    <div className="mt-2">
-      <form onSubmit={handleClick} className="flex flex-col gap-2 items-start">
-        {/* Email List */}
-        {verifiedEmail.length > 0 && (
-          <ul className="mb-2 list-disc pl-5">
+    <div 
+  ref={dropdownRef}
+  className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50"
+>
+
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="text-lg font-semibold text-gray-800">Add Collaborators</h3>
+        <button 
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Verified Email List */}
+      {verifiedEmail.length > 0 && (
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 mb-2">Collaborators to invite:</p>
+          <div className="space-y-1">
             {verifiedEmail.map((elem, idx) => (
-              <li key={idx} className="text-sm text-white-800">{elem}</li>
+              <div key={idx} className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded">
+                <span className="text-sm text-gray-800">{elem}</span>
+                <button
+                  onClick={() => removeEmail(elem)}
+                  className="text-red-500 hover:text-red-700 text-sm font-bold ml-2"
+                >
+                  ×
+                </button>
+              </div>
             ))}
-          </ul>
-        )}
-        <div className="flex gap-2 items-center">
+          </div>
+        </div>
+      )}
+
+      {/* Add Email Form */}
+      <form onSubmit={handleAddEmail} className="space-y-3">
+        <div className="flex gap-2">
           <input
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="Enter collaborator email"
-            className="border rounded px-2 py-1"
+            className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             required
+            disabled={isLoading}
           />
           <button
             type="submit"
-            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+            disabled={isLoading}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Add
-          </button>
-          <button type="submit" onClick={startCollab}>
-            Send Invites
+            {isLoading ? "..." : "Add"}
           </button>
         </div>
+        
+        <button 
+          type="button"
+          onClick={startCollab}
+          disabled={isLoading || verifiedEmail.length === 0}
+          className="w-full bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? "Sending..." : `Go to Collab Page`}
+        </button>
       </form>
     </div>
   );

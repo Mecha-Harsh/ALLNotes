@@ -4,9 +4,10 @@ import Home from './Pages/Home/Home.tsx';
 import Login from './Pages/Login/Login.tsx';
 import SignUp from './Pages/SignUp/SignUp.tsx';
 import { Editor } from './Pages/Home/Editor.tsx';
-import { TestPage } from './Pages/Test/test.tsx';
+// import { TestPage } from './Pages/Test/test.tsx';
 import Verify from './Pages/SignUp/verify.tsx';
 import CollaborationPage from './Pages/CollaboratioPage/collaborationPage.tsx';
+import { Profile } from './Pages/Profile/Profile.tsx';
 import './App.css';
 
 // Fixed closing tag in Routes
@@ -16,9 +17,10 @@ const routes = (
       <Route path='/' element={<Home />} />
       <Route path='/login' element={<Login />} />
       <Route path='/signup' element={<SignUp />} />
-      <Route path='/test' element={<TestPage />} />
+      {/* <Route path='/test' element={<TestPage />} /> */}
       <Route path='/verify' element={<Verify />} />
       <Route path='/collab' element={<CollaborationPage />} />
+      <Route path='/profile' element={<Profile/>} />
     </Routes> {/* Added closing slash */}
   </Router>
 );

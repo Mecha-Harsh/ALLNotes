@@ -150,9 +150,6 @@ export const NoteList = () => {
     </div>
   }
 
-  console.log("Current user ID:", userId);
-  console.log("Selected note ID:", id);
-
   return (
     <aside className="w-64 h-screen bg-stone-50 border-r border-stone-200 p-4 flex flex-col shadow-sm">
       {/* Header */}
