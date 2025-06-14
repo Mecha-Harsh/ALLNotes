@@ -6,22 +6,27 @@ import { deleteAllUserNotes } from '../../IndexDB/db';
 import { useGlobalContext } from '../../Context/context';
 import getAuthToken from '../../utils/getToken';
 import { useVerifyUser } from '../../utils/verifyUser';
-
+import useUpdateProfile from '../../utils/useUserUpdateProfile';
 export const Navbar = () => {
   
-  const {userId,setUserId} = useGlobalContext();
+  const {userD,userId,setUserId} = useGlobalContext();
   const navigate = useNavigate();
   const token = getAuthToken();
   const verifyUser = useVerifyUser();
+  const updateProfile = useUpdateProfile();
+
 
   useEffect(()=>{
+    if(userD.userName==="Guest"){
+      updateProfile();
+    }
     if(userId==="Guest"){
       (async()=>{
         const _uid = await verifyUser();
       setUserId(_uid ?? "Guest");
       })
     }
-    console.log("Form navbar: ",userId);
+    console.log("Form navbar: ",userId,userD);
   },[]);
 
   const handleLogin=()=>{

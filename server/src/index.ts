@@ -9,6 +9,8 @@ import verifyPermission from "./Collab/verifyPermisssion"
 import  getAllNotes  from "./getAllnotes"
 import removeUser from "./Collab/removeUsersFromCollab";
 import getCollabUsers from "./Collab/getCollabUsers";
+import getProfile from "./User/getProfile";
+import updateUserName from "./User/updateUserName";
 const app = express();
 const port = 8080;
 
@@ -23,12 +25,15 @@ app.get('/api',(req,res)=>{
     res.json({"msg":"hello"});
 })
 app.use('/getAllNotes',getAllNotes);
+app.use('/get_note',get_notes);
 app.use('/verifyPermission',verifyPermission);
 app.use('/verifyMail',verifyMail);
 app.use('/update_notes',update_notes);
 app.get('/notes',get_notes);
 app.post('/add_notes',add_notes);
 app.use('/removeUser',removeUser);
+app.use('/getProfile',getProfile);
+app.use('/updateUsername',updateUserName);
 app.get('/getCollabUsers',getCollabUsers);
 
 app.listen(port,()=>{

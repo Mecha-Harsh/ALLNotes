@@ -5,13 +5,14 @@ import { useGlobalContext } from "../Context/context";
 import { supabase } from "../supabase/supabase";
 
 export const useVerifyUser = () => {
-  const { userId, setUserId } = useGlobalContext();
+  const { userId, setUserId,setUserD} = useGlobalContext();
 
   const verifyUser = useCallback(async (): Promise<string | null> => {
     console.log('Current userId:', userId);
     
     if (userId === "Guest" || !userId) {
       try {
+        
         const token = getAuthToken() ?? "";
         console.log('Token:', token);
         

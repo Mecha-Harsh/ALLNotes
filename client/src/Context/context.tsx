@@ -9,6 +9,11 @@ interface Note{
   content:string
 }
 
+interface userDetails{
+  userName:string;
+  email:string;
+}
+
 // Define the shape of your context
 interface GlobalContextType {
   id: string;
@@ -17,6 +22,8 @@ interface GlobalContextType {
   setNotes:React.Dispatch<React.SetStateAction<Note[]>>;
   userId:string;
   setUserId:React.Dispatch<React.SetStateAction<string>>;
+  userD:userDetails;
+  setUserD:React.Dispatch<React.SetStateAction<userDetails>>
 }
 
 // Create the context with a default value
@@ -31,6 +38,7 @@ export const GlobalContextProvider: React.FC<GlobalContextProviderProps> = ({ ch
   const [id, setId] = useState<string>("");
   const [notes,setNotes] = useState<Note[]>([]);
   const[userId,setUserId] = useState<string>("Guest"); // later change that to null 
+  const [userD,setUserD] = useState<userDetails>({userName:"Guest",email:""})
 
   const value = {
     id,
@@ -39,6 +47,8 @@ export const GlobalContextProvider: React.FC<GlobalContextProviderProps> = ({ ch
     setNotes,
     userId,
     setUserId,
+    userD,
+    setUserD
   };
 
   return (

@@ -10,23 +10,11 @@ import getAuthToken from '../../utils/getToken';
 import { useSearchParams } from 'react-router-dom';
 import LoginInCollab from '../Login/lgoin_in_collab';
 import { Users, Circle, Save, Wifi, WifiOff } from 'lucide-react';
-import { 
-  syncLatestNote, 
-  initializeSyncMetadata, 
-  clearSyncMetadata,
-  updateQuillContent,
-  updateYjsContent
-} from './noteSyncUtils';import { IndexeddbPersistence } from 'y-indexeddb';
-
+import { IndexeddbPersistence } from 'y-indexeddb';
 
 
 Quill.register('modules/cursors', QuillCursors);
 
-interface SyncStatus {
-  isLoading: boolean;
-  lastSyncTime: string | null;
-  syncMessage: string;
-}
 
 interface CollaborativeEditorProps {
   roomName?: string;
@@ -60,11 +48,6 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
   userName: propUserName,
   userColor = 'blue',
 }) => {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    isLoading: false,
-    lastSyncTime: null,
-    syncMessage: 'Not synced'
-  });
   const [participants, setParticipants] = useState<string[]>([]);
   const [content, setContent] = useState<string>("");
   const editorRef = useRef<HTMLDivElement>(null);
@@ -148,126 +131,97 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
     console.log("useLayoutEffect triggered - isVerified:", isVerified);
     
     // Don't initialize if not verified or still checking
-    if (!isVerified || !editorRef.current) {
+    if (!isVerified || !editorRef.current ) {
       console.log("Not verified or editorRef null, skipping editor initialization");
       return;
     }
 
-
-    
-
-
-
-  
     console.log("Starting editor initialization");
-  
+
     let isMounted = true;
     let binding: any = null;
     let _provider: WebsocketProvider | null = null;
     let ydoc: Y.Doc | null = null;
-    let indexeddbProvider: IndexeddbPersistence | null = null;
-  
-    const initializeEditor = async (): Promise<void> => {
+
+    const initializeEditor = () => {
       try {
         console.log("Creating Yjs document");
-        
-        // Set sync loading state
-        if (isMounted) {
-          setSyncStatus(prev => ({ ...prev, isLoading: true, syncMessage: 'Initializing...' }));
-        }
-        
         // 1. Create Yjs document
         ydoc = new Y.Doc();
-  
-        // Initialize sync metadata store
-        const metadataInitialized = await initializeSyncMetadata(roomName);
-        if (!metadataInitialized) {
-          console.warn('Failed to initialize sync metadata store');
-        }
-  
-        // 2. Create IndexedDB persistence (using roomName as noteId)
-        indexeddbProvider = new IndexeddbPersistence(roomName, ydoc);
+
+
+      const indexeddbProvider = new IndexeddbPersistence(roomName, ydoc);
+      
+        // STEP 3B: Wait for local data to load first
+      indexeddbProvider.whenSynced;
+      console.log('Local IndexedDB data loaded');
         
-        // Update sync status
-        if (isMounted) {
-          setSyncStatus(prev => ({ ...prev, syncMessage: 'Loading local data...' }));
-        }
-        
-        // Wait for IndexedDB to sync first
-        await indexeddbProvider.whenSynced;
-        console.log('Local IndexedDB data loaded');
-  
-        // Update sync status
-        if (isMounted) {
-          setSyncStatus(prev => ({ ...prev, syncMessage: 'Syncing with server...' }));
-        }
-  
-        // **SYNC WITH SERVER BEFORE PROCEEDING**
-        console.log('Syncing with server...');
-        
-        
-        // Listen for IndexedDB sync events
+        // STEP 3C: Listen for sync events
         indexeddbProvider.on('synced', () => {
           console.log('IndexedDB synced successfully');
         });
   
+
+
         console.log("Creating WebSocket provider");
-        // 3. Create WebSocket provider
+        // 2. Create WebSocket provider
         _provider = new WebsocketProvider('ws://localhost:1234', roomName, ydoc);
-  
+      
+
         console.log("Getting shared text type");
-        // 4. Get shared text type
+        // 3. Get shared text type
         const ytext = ydoc.getText('quill');
-  
+
         console.log("Initializing Quill editor");
-        // 5. Initialize Quill editor
+        // 4. Initialize Quill editor
         const quill = new Quill(editorRef.current!, {
           theme: 'snow',
           modules: _modules,
           placeholder,
         });
-  
+
         // Set the ref immediately
         quillRef.current = quill;
-        const syncResult = await syncLatestNote(roomName, ydoc, quill);
         
-        // Log initial state
+        
+        // Log initial state (will likely be empty)
         logQuillContent('after-quill-init');
-  
+
         console.log("Creating QuillBinding");
         binding = new QuillBinding(ytext, quill, _provider.awareness);
-  
+
         console.log("Quill initialized successfully");
-  
+
         // Add event listeners for content changes
-        quill.on('text-change', (delta: any, oldDelta: any, source: string) => {
+        quill.on('text-change', (delta, oldDelta, source) => {
           console.log('Text changed, source:', source);
           logQuillContent('text-change');
         });
-  
+
         // Listen for when collaborative content is loaded
-        ytext.observe((event: any) => {
+        ytext.observe((event) => {
           console.log('Yjs text observed change:', event);
           // Use setTimeout to ensure DOM is updated
           setTimeout(() => {
             logQuillContent('yjs-text-change');
           }, 0);
+          
         });
-  
-        const updateParticipants = (): void => {
+
+        // setQuillContent();
+
+        const updateParticipants = () => {
           if (!_provider?.awareness) return;
           
           const states = _provider.awareness.getStates();
           const userNames = Array.from(states.values())
-            .map((state: any) => state.user?.name)
+            .map(state => state.user?.name)
             .filter((name): name is string => !!name && name.trim() !== '');
           
           console.log('Updating participants:', userNames);
-          if (isMounted) {
-            setParticipants(userNames);
-          }
+          setParticipants(userNames);
         };
-  
+
         // Listen for provider sync events
         _provider.on('sync', (isSynced: boolean) => {
           console.log('Provider sync status:', isSynced);
@@ -276,57 +230,50 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
             setTimeout(() => {
               updateParticipants();
               logQuillContent('provider-synced');
-            }, 100);
+            }, 100); // Small delay to ensure content is loaded
           }
         });
-  
+
         console.log("Setting user awareness");
         // 6. Set user awareness
         _provider.awareness.setLocalStateField('user', {
           name: userId,
           color: userColor,
         });
-  
-        const awarenessChangeHandler = (): void => {
+
+        const awarenessChangeHandler = () => {
           updateParticipants();
-        };
+        }
         _provider.awareness.on('change', awarenessChangeHandler);
-  
+
         if (isMounted) {
           console.log("Setting provider and connection state");
           setProvider(_provider);
           setIsConnected(_provider.wsconnected);
         }
-  
+
         // Listen for connection status
-        const handleStatus = (): void => {
+        const handleStatus = () => {
           console.log("Connection status changed:", _provider?.wsconnected);
           if (isMounted) setIsConnected(_provider?.wsconnected || false);
         };
         _provider.on('status', handleStatus);
-  
+
         // Log content after a delay to catch any initial sync
         setTimeout(() => {
           logQuillContent('delayed-after-init');
         }, 1000);
-  
-        setTimeout(() => {
+
+        setTimeout(()=>{
           updateParticipants();
-        }, 500);
-  
+        },500);
+
         console.log("Editor initialization complete");
       } catch (error) {
         console.error("Error during editor initialization:", error);
-        if (isMounted) {
-          setSyncStatus({
-            isLoading: false,
-            lastSyncTime: null,
-            syncMessage: 'Initialization failed'
-          });
-        }
       }
     };
-  
+
     initializeEditor();
     
     // Cleanup
@@ -335,7 +282,6 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
       isMounted = false;
       if (binding) binding.destroy();
       if (_provider) _provider.destroy();
-      if (indexeddbProvider) indexeddbProvider.destroy();
       if (ydoc) ydoc.destroy();
       if (editorRef.current) {
         while (editorRef.current.firstChild) {
@@ -344,7 +290,7 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
       }
     };
   }, [roomName, userId, isVerified, userColor, placeholder, propUserName]);
-  
+
   // Toggle connection
   const toggleConnection = () => {
     if (!provider) return;
@@ -386,127 +332,6 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
     );
   }
   
-
-
-  const manualSync = async (): Promise<void> => {
-    if (!provider?.doc || !quillRef.current) {
-      alert('Editor not initialized');
-      return;
-    }
-    
-    setSyncStatus(prev => ({ ...prev, isLoading: true, syncMessage: 'Manual sync...' }));
-    
-    try {
-      // METHOD 1: Use Quill instance to preserve formatting (RECOMMENDED)
-      const syncResult = await syncLatestNote(roomName, provider.doc, quillRef.current);
-      
-      if (syncResult.success) {
-        if (syncResult.updated) {
-          setSyncStatus({
-            isLoading: false,
-            lastSyncTime: new Date().toISOString(),
-            syncMessage: 'Manually synced from server'
-          });
-          alert('Content updated from server with formatting preserved!');
-        } else {
-          setSyncStatus({
-            isLoading: false,
-            lastSyncTime: new Date().toISOString(),
-            syncMessage: 'Already up to date'
-          });
-          alert('Already up to date!');
-        }
-      } else {
-        setSyncStatus({
-          isLoading: false,
-          lastSyncTime: null,
-          syncMessage: `Sync failed: ${syncResult.message}`
-        });
-        alert('Sync failed: ' + syncResult.message);
-      }
-    } catch (error: any) {
-      setSyncStatus({
-        isLoading: false,
-        lastSyncTime: null,
-        syncMessage: 'Sync error'
-      });
-      alert('Sync error: ' + error.message);
-    }
-  };
-
-
-
-  const testBothMethods = async (): Promise<void> => {
-    if (!provider?.doc || !quillRef.current) {
-      alert('Editor not initialized');
-      return;
-    }
-    
-    const choice = window.confirm(
-      'Choose sync method:\n' +
-      'OK = Method 1 (Preserves formatting - RECOMMENDED)\n' +
-      'Cancel = Method 2 (Loses formatting - LEGACY)'
-    );
-    
-    setSyncStatus(prev => ({ ...prev, isLoading: true, syncMessage: 'Testing sync...' }));
-    
-    try {
-      let syncResult;
-      
-      if (choice) {
-        // METHOD 1: With Quill instance (preserves formatting)
-        console.log('Testing Method 1: Quill instance method');
-        syncResult = await syncLatestNote(roomName, provider.doc, quillRef.current);
-      } else {
-        // METHOD 2: Without Quill instance (loses formatting)
-        console.log('Testing Method 2: Yjs only method');
-        syncResult = await syncLatestNote(roomName, provider.doc); // No quill instance
-      }
-      
-      if (syncResult.success) {
-        setSyncStatus({
-          isLoading: false,
-          lastSyncTime: new Date().toISOString(),
-          syncMessage: choice ? 'Method 1 sync complete' : 'Method 2 sync complete'
-        });
-        alert(`${choice ? 'Method 1' : 'Method 2'} sync completed: ${syncResult.message}`);
-      } else {
-        setSyncStatus({
-          isLoading: false,
-          lastSyncTime: null,
-          syncMessage: 'Sync failed'
-        });
-        alert('Sync failed: ' + syncResult.message);
-      }
-    } catch (error: any) {
-      setSyncStatus({
-        isLoading: false,
-        lastSyncTime: null,
-        syncMessage: 'Sync error'
-      });
-      alert('Sync error: ' + error.message);
-    }
-  };
-  
-  // Clear sync metadata function (useful for testing)
-  const clearSync = async (): Promise<void> => {
-    const success = await clearSyncMetadata(roomName);
-    if (success) {
-      setSyncStatus({
-        isLoading: false,
-        lastSyncTime: null,
-        syncMessage: 'Sync metadata cleared'
-      });
-      alert('Sync metadata cleared');
-    } else {
-      alert('Failed to clear sync metadata');
-    }
-  };
-  
-
-
-
-
   // Access denied state
   if (!isVerified) {
     console.log("Rendering denied state");
@@ -518,11 +343,6 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
   }
 
   console.log("Rendering main editor component");
-
-
-
-
-
 
   // Main editor component with sidebar
   return (
@@ -607,24 +427,6 @@ const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
                   <Save className="w-4 h-4" />
                   Save
                 </button>
-                <button
-                    onClick={manualSync}
-                    disabled={syncStatus.isLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-purple-500 hover:bg-purple-600 text-white transition-colors disabled:opacity-50"
-                  >
-                    {syncStatus.isLoading ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Wifi className="w-4 h-4" />
-                    )}
-                    Sync
-                  </button>
-                  <button
-                    onClick={testBothMethods}
-                    // disabled={syncStatus}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50">
-                    Test Methods
-                  </button>
                 <button
                   onClick={toggleConnection}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${

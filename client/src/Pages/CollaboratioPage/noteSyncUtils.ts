@@ -225,7 +225,29 @@ export const getYjsDocumentState = (ydoc: Y.Doc, textFieldName: string = 'quill'
 };
 
 /**
- * Converts HTML content to plain text and updates Yjs document
+ * METHOD 1: Updates Quill content directly (RECOMMENDED - Preserves formatting)
+ * This method sets HTML content directly to Quill, preserving all formatting
+ */
+export const updateQuillContent = (content: string, quillInstance: any): void => {
+  try {
+    if (!content.trim()) {
+      quillInstance.setText('');
+      console.log('Cleared Quill content');
+      return;
+    }
+    
+    // Set HTML content directly to Quill's editor
+    quillInstance.root.innerHTML = content;
+    console.log('Quill content updated with HTML formatting preserved');
+    
+  } catch (error) {
+    console.error('Error updating Quill content:', error);
+  }
+};
+
+/**
+ * METHOD 2: Converts HTML content to plain text and updates Yjs document (LEGACY - Loses formatting)
+ * This is the old method that loses formatting - kept for backward compatibility
  */
 export const updateYjsContent = (ydoc: Y.Doc, content: string, textFieldName: string = 'quill'): void => {
   try {
@@ -237,7 +259,7 @@ export const updateYjsContent = (ydoc: Y.Doc, content: string, textFieldName: st
       ytext.delete(0, currentLength);
     }
     
-    // Convert HTML to plain text
+    // Convert HTML to plain text (this loses formatting)
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = content;
     const plainText = tempDiv.textContent || tempDiv.innerText || '';
@@ -246,7 +268,7 @@ export const updateYjsContent = (ydoc: Y.Doc, content: string, textFieldName: st
       ytext.insert(0, plainText);
     }
     
-    console.log('Yjs content updated successfully, new length:', ytext.length);
+    console.log('Yjs content updated (formatting lost), new length:', ytext.length);
   } catch (error) {
     console.error('Error updating Yjs content:', error);
   }
@@ -310,10 +332,12 @@ export const checkYjsIndexedDBContent = async (noteId: string): Promise<boolean>
 
 /**
  * Main function to sync the latest note with local storage
+ * Updated to support both methods of content updating
  */
 export const syncLatestNote = async (
   noteId: string, 
   ydoc: Y.Doc, 
+  quillInstance?: any, // Optional Quill instance for Method 1 (recommended)
   textFieldName: string = 'quill'
 ): Promise<SyncResult> => {
   try {
@@ -363,8 +387,16 @@ export const syncLatestNote = async (
     if (serverTimestamp > localTimestamp || (!localDocState.hasContent && noteData.content.trim())) {
       console.log('Server note is newer or local is empty, updating local content');
       
-      // Update Yjs document with server content
-      updateYjsContent(ydoc, noteData.content, textFieldName);
+      // METHOD 1: Use Quill instance to preserve formatting (RECOMMENDED)
+      if (quillInstance) {
+        console.log('Using Method 1: Direct Quill update (formatting preserved)');
+        updateQuillContent(noteData.content, quillInstance);
+      } else {
+        // METHOD 2: Fallback to Yjs update (formatting lost)
+        console.warn('Using Method 2: Yjs update (formatting will be lost)');
+        console.warn('Consider passing quillInstance parameter to preserve formatting');
+        updateYjsContent(ydoc, noteData.content, textFieldName);
+      }
       
       // Save the new sync timestamp
       await saveLastSyncTimestamp(noteId, noteData.updatedAt);
@@ -372,7 +404,9 @@ export const syncLatestNote = async (
       return {
         success: true,
         updated: true,
-        message: 'Note synchronized with server',
+        message: quillInstance 
+          ? 'Note synchronized with server (formatting preserved)' 
+          : 'Note synchronized with server (formatting may be lost)',
         content: noteData.content,
         updatedAt: noteData.updatedAt
       };

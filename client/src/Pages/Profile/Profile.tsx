@@ -4,6 +4,7 @@ import { useGlobalContext } from '../../Context/context';
 import getAuthToken from '../../utils/getToken';
 import { useVerifyUser } from '../../utils/verifyUser';
 import Navbar from '../../component/Navbar/Navbar';
+import { getAllNotes } from '../../IndexDB/db';
 
 // Type definitions
 interface CollaborationEntry {
@@ -17,7 +18,7 @@ interface GroupedNoteData {
 }
 
 export const Profile: React.FC = () => {
-    const { userId, setUserId } = useGlobalContext();
+    const { setNotes,setUserD,userD,userId, setUserId,notes} = useGlobalContext();
     const [noteIds, setNoteIds] = useState<CollaborationEntry[]>([]);
     const [groupedData, setGroupedData] = useState<GroupedNoteData[]>([]);
     const [removeIds, setRemoveIds] = useState<string[]>([]);
@@ -29,10 +30,20 @@ export const Profile: React.FC = () => {
     const [newUsername, setNewUsername] = useState<string>('');
     const [isEditingUsername, setIsEditingUsername] = useState<boolean>(false);
     const [usernameLoading, setUsernameLoading] = useState<boolean>(false);
+
+
+    const fetchNotes = useCallback(async () => {
+        try {
+          const allNotes = await getAllNotes(userId);
+          setNotes(allNotes);
+        } catch (error) {
+          console.error('Error fetching notes:', error);
+        }
+      }, [setNotes, userId]);
     
     const verifyUser = useVerifyUser();
     const token: string | null = getAuthToken();
-
+    console.log("nnotes",notes);
     useEffect(() => {
         if (userId === "Guest") {
             setLoading(true);
@@ -41,10 +52,15 @@ export const Profile: React.FC = () => {
                 setUserId(_uid ?? "Guest");
             })();
         }
+        fetchNotes();
         setLoading(false);
     }, [userId, setUserId, verifyUser]);
 
     // Function to group user IDs by note ID
+
+
+    
+
     const groupUsersByNote = useCallback((data: CollaborationEntry[]): GroupedNoteData[] => {
         if (!Array.isArray(data) || data.length === 0) {
             return [];
@@ -217,7 +233,7 @@ export const Profile: React.FC = () => {
 
     // Handle username change
     const handleUsernameChange = async (): Promise<void> => {
-        if (!newUsername.trim() || newUsername === userId) {
+        if (!newUsername.trim() || newUsername === userD.userName) {
             setIsEditingUsername(false);
             setNewUsername('');
             return;
@@ -225,14 +241,12 @@ export const Profile: React.FC = () => {
 
         try {
             setUsernameLoading(true);
-            // Add your username update API call here
-            // const response = await axios.put('http://localhost:8080/updateUsername', 
-            //     { username: newUsername }, 
-            //     { headers: { 'Authorization': `Bearer ${token}` } }
-            // );
-            
-            // For now, just update the context
-            setUserId(newUsername);
+            const response = await axios.post('http://localhost:8080/updateUsername', 
+                { userName: newUsername }, 
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            const email = userD.email;
+            setUserD({userName:newUsername,email:email});
             setIsEditingUsername(false);
             setNewUsername('');
         } catch (err) {
@@ -274,7 +288,7 @@ export const Profile: React.FC = () => {
                         <div className="hidden sm:block">
                             <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
                                 <span className="text-2xl text-white font-bold">
-                                    {userId.charAt(0).toUpperCase()}
+                                    {userD.userName.charAt(0).toUpperCase()}
                                 </span>
                             </div>
                         </div>
@@ -293,7 +307,7 @@ export const Profile: React.FC = () => {
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                 <div className="flex items-center space-x-3">
                                     <span className="text-xl font-semibold text-gray-800 bg-white px-4 py-2 rounded-lg border">
-                                        {userId}
+                                        {userD.userName}
                                     </span>
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                         Active
@@ -302,7 +316,7 @@ export const Profile: React.FC = () => {
                                 <button
                                     onClick={() => {
                                         setIsEditingUsername(true);
-                                        setNewUsername(userId);
+                                        setNewUsername(userD.userName);
                                     }}
                                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                                 >
@@ -342,6 +356,13 @@ export const Profile: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            Email
+                        </h3>
+                        <span className="text-xl font-semibold text-gray-800 bg-white px-4 py-2 rounded-lg border">
+                            {userD.email}
+                        </span>
                     </div>
                 </div>
 
@@ -377,9 +398,12 @@ export const Profile: React.FC = () => {
                                     <div key={noteGroup.note_id} className="bg-gray-50 rounded-xl p-6 transition-all hover:shadow-md">
                                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
                                             <div>
-                                                <h4 className="text-lg font-semibold text-gray-900 font-mono bg-white px-3 py-1 rounded-lg inline-block mb-2">
-                                                    {noteGroup.note_id}
-                                                </h4>
+                                            <h4 className="text-lg font-semibold text-gray-900 font-mono bg-white px-3 py-1 rounded-lg inline-block mb-2">
+                                                {(() => {
+                                                    const foundNote = notes.find(note => note.id === noteGroup.note_id);
+                                                    return foundNote ? foundNote.title : `Note #${noteGroup.note_id}`;
+                                                })()}
+                                            </h4>
                                                 <p className="text-sm text-gray-600 flex items-center">
                                                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />

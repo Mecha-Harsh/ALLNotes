@@ -1,3 +1,7 @@
+// this file contain the colllab upto which the autosycn was working but stle was removed.....
+
+
+
 // noteSyncUtils.ts
 import axios, { type AxiosResponse } from 'axios';
 // Adjust path as needed

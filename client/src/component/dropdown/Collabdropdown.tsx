@@ -10,11 +10,14 @@ interface CollabdropdownProps {
 
 const Collabdropdown: React.FC<CollabdropdownProps> = ({ onClose }) => {
   const { id, userId } = useGlobalContext();
+  
   const [email, setEmail] = useState<string>("");
   const [verifiedEmail, setVerifiedEmail] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  let link = `http://localhost:5173/collab?id=${encodeURIComponent(id)}`;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -31,11 +34,6 @@ const Collabdropdown: React.FC<CollabdropdownProps> = ({ onClose }) => {
   }, [onClose]);
 
   const startCollab = async () => {
-    if (verifiedEmail.length === 0) {
-      alert("Please add at least one collaborator before sending invites");
-      return;
-    }
-
     setIsLoading(true);
     try {
       // Send invites to all verified emails
@@ -56,6 +54,25 @@ const Collabdropdown: React.FC<CollabdropdownProps> = ({ onClose }) => {
       alert("Failed to send invites. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+
+  const copyToClipboard = async () => {
+    try {
+      // Replace this with your actual collaboration link
+      
+      await navigator.clipboard.writeText(link);
+      
+      // Optional: Show success feedback
+      alert('Link copied to clipboard!');
+      // Or use a toast notification if you have one
+      
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      
+      // Fallback for older browsers
+      fallbackCopyToClipboard(link);
     }
   };
   
@@ -151,18 +168,33 @@ const Collabdropdown: React.FC<CollabdropdownProps> = ({ onClose }) => {
             {isLoading ? "..." : "Add"}
           </button>
         </div>
+        <div className="flex gap-2 w-full">
+          <button 
+            type="button"
+            onClick={startCollab}
+            disabled={isLoading}
+            className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? "Sending..." : "Go to Collab Page"}
+          </button>
+          
+          <button
+            type="button"
+            onClick={copyToClipboard}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium"
+          >
+            Copy Link
+          </button>
+        </div>
+
         
-        <button 
-          type="button"
-          onClick={startCollab}
-          disabled={isLoading || verifiedEmail.length === 0}
-          className="w-full bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? "Sending..." : `Go to Collab Page`}
-        </button>
       </form>
     </div>
   );
 };
 
 export default Collabdropdown;
+function fallbackCopyToClipboard(link: string) {
+  throw new Error("Function not implemented.");
+}
+

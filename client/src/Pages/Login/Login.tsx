@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGlobalContext } from '../../Context/context';
 import { syncNotes } from '../../utils/ConflictHandler';
 import { useVerifyUser } from '../../utils/verifyUser';
+import useUpdateProfile from '../../utils/useUserUpdateProfile';
 
 export async function loginWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -17,6 +18,7 @@ export async function loginWithEmail(email: string, password: string) {
 }
 
 const Login = () => {
+  const updateProfile = useUpdateProfile();
   const navigate = useNavigate();
   const [isVerified, setIsVerified] = useState(false);
   const [user, setUser] = useState<string>("");
@@ -36,6 +38,7 @@ const Login = () => {
         if (verifiedUserId && verifiedUserId !== "Guest") {
           setUser(verifiedUserId);
           console.log('Auto-login successful for user:', verifiedUserId);
+          updateProfile();
           setIsVerified(true);
         } else {
           console.log('No valid session found');
